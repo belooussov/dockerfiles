@@ -4,8 +4,8 @@
 # docker run --rm -it \
 # 	-v /tmp/.X11-unix:/tmp/.X11-unix \
 # 	-e DISPLAY=unix$DISPLAY \
-# 	-e "BALSAMIC_LICENSENAME="" \
-# 	-e "BALSAMIC_LICENSEKEY="" \
+# 	-e BALSAMIC_LICENSENAME="" \
+# 	-e BALSAMIC_LICENSEKEY="" \
 # 	-e USERPERMS="$(stat -c '%u:%g' $(pwd))" \
 # 	-v "$(pwd)":/home/balsamiq/shared-data \
 # 	-u balsamiq \
