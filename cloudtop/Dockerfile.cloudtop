@@ -1,0 +1,56 @@
+FROM ubuntu:xenial
+LABEL maintainer Therry van Neerven <mail@therryvanneerven.nl>
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update \
+    && apt-get install -y mate-core mate-desktop-environment mate-notification-daemon \
+    sudo \
+    pulseaudio \
+    firefox \
+    wget \
+    xserver-xorg-video-dummy \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY artefacts/xrdp_0.6.3-devel_1_amd64.deb /tmp/xrdp.deb
+RUN dpkg -i /tmp/xrdp.deb && rm /tmp/xrdp.deb
+COPY artefacts/xrdp.ini /etc/xrdp/xrdp.ini
+
+COPY artefacts/module-xrdp-sink.so /usr/lib/pulse-8.0/modules/module-xrdp-sink.so
+RUN echo "load-module module-xrdp-sink" >> /etc/pulse/default.pa
+
+RUN sed -i '/TerminalServerUsers/d' /etc/xrdp/sesman.ini \
+    && sed -i '/TerminalServerAdmins/d' /etc/xrdp/sesman.ini
+
+RUN useradd -ms /bin/bash cloudtop \
+    && echo "cloudtop:cloudtop" | chpasswd \
+    && usermod -aG sudo cloudtop \
+    && mkdir -p /home/cloudtop/.config/ \
+    && chown cloudtop:cloudtop /home/cloudtop/.config/
+
+RUN mkdir /opt/X11dummy/
+COPY artefacts/xorg.conf /opt/X11dummy/xorg.conf
+RUN wget -O /tmp/virtualgl.deb http://downloads.sourceforge.net/project/virtualgl/2.5.1/virtualgl_2.5.1_amd64.deb \
+    && dpkg -i /tmp/virtualgl.deb \
+    && rm /tmp/virtualgl.deb \
+    && chmod u+s /usr/lib/libdlfaker.so \
+    && chmod u+s /usr/lib/libvglfaker.so
+
+RUN echo "/opt/VirtualGL/bin/vglrun -d :11.0 mate-session" > /home/cloudtop/.xsession
+
+COPY artefacts/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN echo "#!/bin/bash" >/entrypoint.sh && \
+    echo "xrdp-keygen xrdp auto 2048" >> entrypoint.sh && \
+    echo "# start xrdp session manager" >>/entrypoint.sh && \
+    echo "xrdp-sesman" >>/entrypoint.sh && \
+    echo "/usr/bin/supervisord" >>/entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+COPY artefacts/X11rdp.tar /tmp/X11rdp.tar
+RUN tar -xf /tmp/X11rdp.tar -C / \
+    && ln -s /opt/X11rdp/bin/X11rdp /usr/local/bin/X11rdp \
+    && rm /tmp/X11rdp.tar
+
+ENTRYPOINT ["/entrypoint.sh"]

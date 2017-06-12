@@ -1,0 +1,30 @@
+FROM ubuntu:xenial
+LABEL maintainer Therry van Neerven <mail@therryvanneerven.nl>
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update && apt -y install git curl build-essential m4 intltool libtool libtool-bin libcap-dev libsndfile1-dev libssl-dev libpam0g-dev libx11-dev libx11-dev libxfixes-dev libxrandr-dev libjson-c-dev libjpeg-dev unzip checkinstall wget python python-libxml2 flex bison xsltproc gettext autoconf libxml-parser-perl libfuse-dev fuse nasm xserver-xorg-dev \
+&& mkdir /tmp/out
+
+WORKDIR /tmp/pulse
+RUN curl https://freedesktop.org/software/pulseaudio/releases/pulseaudio-8.0.tar.gz -O \
+    && tar -zxvf pulseaudio-8.0.tar.gz \
+    && cd pulseaudio-8.0 && ./configure
+
+
+WORKDIR /tmp/xrdp
+RUN git clone --recursive https://github.com/neutrinolabs/xrdp.git . \
+    && git checkout 589b29f92f7aabc3ff2212cd5be93bb6bce6b811 \
+    && cd librfxcodec && ./bootstrap && ./configure && make \
+    && cd .. \
+    && ./bootstrap \
+    && ./configure --enable-rfxcodec \
+    && make && make install \
+    && checkinstall -D -y --install=no --fstrans=yes --pkgversion=0.6.3-dev && mv xrdp_0.6.3-dev-1_amd64.deb /tmp/out/
+
+RUN cd sesman/chansrv/pulse/ \
+    && sed -i.bak 's/^\(PULSE_DIR = \).*/\1\/tmp\/pulse\/pulseaudio-8.0\//' Makefile \
+    && make \
+    && mv module-xrdp-sink.so /tmp/out/
+
+RUN cd /tmp/xrdp/xorg/X11R7.6 &&  ./buildx.sh /opt/X11rdp
